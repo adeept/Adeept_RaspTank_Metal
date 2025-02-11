@@ -3,7 +3,7 @@ import threading
 import numpy
 from numpy import sin, cos, pi
 import time
-class Freenove_SPI_LedPixel(threading.Thread):
+class Adeept_SPI_LedPixel(threading.Thread):
     def __init__(self, count = 8, bright = 255, sequence='GRB', bus = 0, device = 0, *args, **kwargs):
         self.set_led_type(sequence)
         self.set_led_count(count)
@@ -16,7 +16,7 @@ class Freenove_SPI_LedPixel(threading.Thread):
         self.breathSteps = 10
         #self.spi_gpio_info()
         self.set_all_led_color(0,0,0)
-        super(Freenove_SPI_LedPixel, self).__init__(*args, **kwargs)
+        super(Adeept_SPI_LedPixel, self).__init__(*args, **kwargs)
         self.__flag = threading.Event()
         self.__flag.clear()
     def led_begin(self, bus = 0, device = 0):
@@ -283,12 +283,12 @@ if __name__ == '__main__':
     print("spidev device as show:")
     os.system("ls /dev/spi*")
     
-    led = Freenove_SPI_LedPixel(8, 255)              # Use MOSI for /dev/spidev0 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 0)   # Use MOSI for /dev/spidev0 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 1)   # Use MOSI for /dev/spidev1 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 3)   # Use MOSI for /dev/spidev3 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 5)   # Use MOSI for /dev/spidev5 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 6)   # Use MOSI for /dev/spidev6 to drive the lights
+    led = Adeept_SPI_LedPixel(8, 255)              # Use MOSI for /dev/spidev0 to drive the lights
+    #led = Adeept_SPI_LedPixel(8, 255, 'GRB', 0)   # Use MOSI for /dev/spidev0 to drive the lights
+    #led = Adeept_SPI_LedPixel(8, 255, 'GRB', 1)   # Use MOSI for /dev/spidev1 to drive the lights
+    #led = Adeept_SPI_LedPixel(8, 255, 'GRB', 3)   # Use MOSI for /dev/spidev3 to drive the lights
+    #led = Adeept_SPI_LedPixel(8, 255, 'GRB', 5)   # Use MOSI for /dev/spidev5 to drive the lights
+    #led = Adeept_SPI_LedPixel(8, 255, 'GRB', 6)   # Use MOSI for /dev/spidev6 to drive the lights
     try:
         if led.check_spi_state() != 0:
             led.set_led_count(8)

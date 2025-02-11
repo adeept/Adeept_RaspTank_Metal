@@ -168,7 +168,6 @@ class Adeept_SPI_LedPixel(threading.Thread):
             #tx[7-ibit::8]=((d>>ibit)&1)*0x30 + 0xC0   #T0H=2,T0L=6, T1H=4,T1L=4   #0b11110000 mean T1(0.625us),   0b11000000 mean T0(0.3125us)
             #tx[7-ibit::8]=((d>>ibit)&1)*0x20 + 0xC0   #T0H=2,T0L=6, T1H=3,T1L=5   #0b11100000 mean T1(0.46875us), 0b11000000 mean T0(0.3125us)
             #tx[7-ibit::8]=((d>>ibit)&1)*0x7E + 0x80   #T0H=1,T0L=7, T1H=7,T1L=1   #0b11111110 mean T1(0.09375us), 0b10000000 mean T0(0.15625us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x7C + 0x80   #T0H=1,T0L=7, T1H=6,T1L=2I:\更新产品\Freenove_Complete_Starter_Kit_for_Raspberry_Pi-main\Code\Python_GPIOZero_Code\32.3.1_SPILedpixel\SPI_Ledpixel.py   #0b11111100 mean T1(0.9375us),  0b10000000 mean T0(0.15625us)
             #tx[7-ibit::8]=((d>>ibit)&1)*0x78 + 0x80   #T0H=1,T0L=7, T1H=5,T1L=3   #0b11111000 mean T1(0.78125us), 0b10000000 mean T0(0.15625us)
             #tx[7-ibit::8]=((d>>ibit)&1)*0x70 + 0x80   #T0H=1,T0L=7, T1H=4,T1L=4   #0b11110000 mean T1(0.625us),   0b10000000 mean T0(0.15625us)
             #tx[7-ibit::8]=((d>>ibit)&1)*0x60 + 0x80   #T0H=1,T0L=7, T1H=3,T1L=5   #0b11100000 mean T1(0.46875us), 0b10000000 mean T0(0.15625us)
@@ -462,11 +461,6 @@ if __name__ == '__main__':
 #    os.system("ls /dev/spi*")
     
     led = Adeept_SPI_LedPixel(8, 255)              # Use MOSI for /dev/spidev0 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 0)   # Use MOSI for /dev/spidev0 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 1)   # Use MOSI for /dev/spidev1 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 3)   # Use MOSI for /dev/spidev3 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 5)   # Use MOSI for /dev/spidev5 to drive the lights
-    #led = Freenove_SPI_LedPixel(8, 255, 'GRB', 6)   # Use MOSI for /dev/spidev6 to drive the lights
     try:
         if led.check_spi_state() != 0:
             led.set_led_count(8)

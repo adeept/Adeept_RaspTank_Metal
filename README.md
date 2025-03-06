@@ -5,7 +5,7 @@ Adeept RaspTank Metal is an open source intelligent robotics product for artific
 ## Resources Links
 
 [RobotName]: Adeept RaspTank Metal \
-[Item Code]: ADR013-Metal \
+[Item Code]: ADR034 \
 [Official Raspberry Pi website]: https://www.raspberrypi.org/downloads/    \
 [Official website]:  https://www.adeept.com/     \
 [GitHub]: https://github.com/adeept/Adeept_RaspTank_Metal/     

@@ -150,8 +150,7 @@ def functionSelect(command_input, response):
         #     screen.screen_show(5,'POLICE')
         servoPosInit()
         fuc.keepDistance()
-        if WS2812_mark:
-            WS2812.police()
+        WS2812.police()
 
     elif 'police' == command_input:
         WS2812.police()
@@ -168,8 +167,7 @@ def functionSelect(command_input, response):
             fuc.pause()
 
     elif 'automaticOff' == command_input:
-        if WS2812_mark:
-            WS2812.pause()
+        WS2812.pause()
         fuc.pause()
         move.motorStop()
         time.sleep(0.3)
@@ -420,9 +418,8 @@ def wifi_check():
         ap_threading.start()                                  #Thread starts
         # if OLED_connection:
         #     screen.screen_show(2, 'AP Starting 10%')
-        if WS2812_mark:
-            WS2812.set_all_led_color_data(0,16,50)
-            WS2812.show()
+        WS2812.set_all_led_color_data(0,16,50)
+        WS2812.show()
         time.sleep(1)
 
 async def check_permit(websocket):

@@ -23,17 +23,8 @@ MOTOR_M4_IN2 =  9       #Define the negative pole of M4
 M1_Direction   = -1
 M2_Direction  = -1
 
-left_forward  = 1
-left_backward = 0
-
-right_forward = 0
-right_backward= 1
-
-pwn_A = 0
-pwm_B = 0
-# FREQ = 1000
 FREQ = 50
-# motor1,motor2,motor3,motor4,pwm_motor  = None
+
 
 
 '''
@@ -55,16 +46,6 @@ def setup():#Motor initialization
     # Create a simple PCA9685 class instance.
     #  pwm_motor.channels[7].duty_cycle = 0xFFFF
     pwm_motor = PCA9685(i2c, address=0x5f) #default 0x40
-    
-    
-    # motor1 = motor.DCMotor(pwm_motor.channels[MOTOR_M1_IN1],pwm_motor.channels[MOTOR_M1_IN2] )
-    # motor1.decay_mode = (motor.SLOW_DECAY)
-    # motor2 = motor.DCMotor(pwm_motor.channels[MOTOR_M2_IN1],pwm_motor.channels[MOTOR_M2_IN2] )
-    # motor2.decay_mode = (motor.SLOW_DECAY)
-    # motor3 = motor.DCMotor(pwm_motor.channels[MOTOR_M3_IN1],pwm_motor.channels[MOTOR_M3_IN2] )
-    # motor3.decay_mode = (motor.SLOW_DECAY)
-    # motor4 = motor.DCMotor(pwm_motor.channels[MOTOR_M4_IN1],pwm_motor.channels[MOTOR_M4_IN2] )
-    # motor4.decay_mode = (motor.SLOW_DECAY)
 
     pwm_motor.frequency = FREQ
 
@@ -156,7 +137,7 @@ def trackingMove(speed, direction, turn, radius=0.6):   # 0 < radius <= 1
             Motor(2, -M2_Direction, speed)
 
 
-# ÓÃÓÚÊÓÆµÑ²ÏßÊ±µÄµç»úËÙ¶È¿ØÖÆ¡£
+# ç”¨äºŽè§†é¢‘å·¡çº¿æ—¶çš„ç”µæœºé€Ÿåº¦æŽ§åˆ¶ã€‚
 # Used for motor speed control during video line patrol.
 def video_Tracking_Move(speed, direction, turn, radius=0):   # 0 < radius <= 1  
     #eg: move(100, 1, "mid")--->forward

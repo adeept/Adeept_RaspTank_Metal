@@ -522,11 +522,6 @@ if __name__ == '__main__':
     
     move.setup()
 
-    HOST = ''
-    PORT = 10223                              #Define port serial 
-    BUFSIZ = 1024                             #Define buffer size
-    ADDR = (HOST, PORT)
-
     global flask_app
     flask_app = app.webapp()
     flask_app.startthread()

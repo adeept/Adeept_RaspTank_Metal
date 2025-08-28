@@ -134,7 +134,7 @@ commands_3 = [
     "sudo git clone https://github.com/oblique/create_ap",
     "cd create_ap && sudo make install",
     # "cd //home/pi/create_ap && sudo make install",
-    "sudo apt-get install -y util-linux procps hostapd iproute2 iw haveged dnsmasq"
+    "sudo apt-get install -y util-linux procps hostapd iproute2 iw haveged dnsmasq iptables iptables-persistent"
 ]
 
 mark_3 = 0
@@ -145,6 +145,7 @@ for x in range(3):
             mark_2 = 1
     if mark_3 == 0:
         break
+
 
 
 try:
@@ -165,6 +166,19 @@ except:
 
 
 os.system("sudo chmod 777 /"+ user_home +"/startup.sh")
+
+rc_local_path = "/etc/rc.local"
+if not os.path.exists(rc_local_path):
+    print(f"{rc_local_path} does not exist. Creating it...")
+    with open(rc_local_path, "w") as file:
+        file.write("#!/bin/sh -e\n")
+        file.write("_IP=$(hostname -I) || true\n")
+        file.write('if [ "$_IP" ]; then\n')
+        file.write('  printf "My IP address is %s\\n" "$_IP"\n')
+        file.write("fi\n")
+        file.write("exit 0\n")
+    os.system("sudo chown root:root /etc/rc.local")
+    os.system("sudo chmod +x /etc/rc.local")
 replace_num('/etc/rc.local','fi','fi\n/'+ user_home +'/startup.sh start')
 
 print('The program in Raspberry Pi has been installed, disconnected and restarted. \nYou can now power off the Raspberry Pi to install the camera and driver board (Robot HAT). \nAfter turning on again, the Raspberry Pi will automatically run the program to set the servos port signal to turn the servos to the middle position, which is convenient for mechanical assembly.')

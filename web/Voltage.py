@@ -9,6 +9,7 @@ from collections import deque
 from gpiozero import TonalBuzzer
 import switch as switch
 import smbus
+import Buzzer
 
 OLED_connection = 1
 
@@ -23,13 +24,12 @@ except:
     pass
 
 # Initialize buzzer
-buzzer = TonalBuzzer(18)
 SINGLE_NOTE = [("C4", 1)]
 
 
 average_voltage = 0.0
 
-
+full_voltage = 8.4
 WarningThreshold = 6
 # read the ADC value of channel 0
 ADCVref = 4.93
@@ -88,9 +88,9 @@ class BatteryLevelMonitor(threading.Thread):
 
     def play_note(self):
         for note, duration in SINGLE_NOTE:
-            buzzer.play(note)
+            Buzzer.tb.play(note)
             time.sleep(float(duration))
-        buzzer.stop()
+        Buzzer.tb.stop()
 
     def trigger_alarm(self):
         self.play_note()
@@ -103,6 +103,9 @@ class BatteryLevelMonitor(threading.Thread):
         switch.switch(2, 0)
         switch.switch(3, 0)
 
+    def get_battery_percentage(self):
+        percentage = int((average_voltage - WarningThreshold) / (full_voltage - WarningThreshold) * 100)
+        return str(percentage)
 
 if __name__ == "__main__":
     monitor = BatteryLevelMonitor()

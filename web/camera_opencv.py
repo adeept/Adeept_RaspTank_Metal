@@ -13,18 +13,10 @@ import PID
 import time
 import threading
 import imutils
-
 import picamera2
 import libcamera
+from picamera2 import Picamera2
 
-from picamera2 import Picamera2, Preview
-import io
-# from threading import Condition, Thread, Event
-from picamera2.encoders import MJPEGEncoder
-from picamera2.outputs import FileOutput
-# import robotLight
-
-# led = robotLight.RobotLight()
 pid = PID.PID()
 pid.SetKp(0.5)
 pid.SetKd(0)
@@ -35,24 +27,17 @@ findLineMove = 1
 tracking_servo_status = 0
 FLCV_Status = 0
 
-CVRun = 1
 linePos_1 = 440
 linePos_2 = 380
 lineColorSet = 255
 frameRender = 1
 findLineError = 20
-# left_forward  = 0
-# left_backward = 1
-
-# right_forward = 0
-# right_backward= 1
-# When turning, only one wheel pushes the car, so a value higher than forward_speed is required.
-turn_speed = 35 # Range of values: 0-100
+turn_speed = 40 # Range of values: 0-100
 forward_speed = 20 # Avoid too fast, the video screen does not respond in time. Range of values: 0-100.
 
-
-hflip = 0 # Video flip horizontally: 0 or 1 ����Ƶ�Ƿ���Ҫˮƽ��ת��
-vflip = 0 # Video vertical flip: 0/1 ����Ƶ�Ƿ���Ҫ��ֱ��ת��
+APPMode = None
+hflip = 0 # Video flip horizontally: 0 or 1
+vflip = 0 # Video vertical flip: 0/1 
 ImgIsNone = 0
 
 colorUpper = np.array([44, 255, 255])
@@ -62,17 +47,10 @@ def map(input, in_min,in_max,out_min,out_max):
     return (input-in_min)/(in_max-out_min)*(out_max-out_min)+out_min
 
 class CVThread(threading.Thread):
-# class CVThread(Thread):
     font = cv2.FONT_HERSHEY_SIMPLEX
 
     kalman_filter_X =  Kalman_filter.Kalman_filter(0.01,0.1)
     kalman_filter_Y =  Kalman_filter.Kalman_filter(0.01,0.1)
-    P_direction = -1
-    T_direction = -1
-    P_servo = 1 # Horizontal servo
-    T_servo = 2 # Vertical servo
-    P_anglePos = 0
-    T_anglePos = 0
     cameraDiagonalW = 64
     cameraDiagonalH = 48
     videoW = 640
@@ -83,10 +61,8 @@ class CVThread(threading.Thread):
 
     scGear = RPIservo.ServoCtrl()
     scGear.moveInit()
-    Tracking_sc = RPIservo.ServoCtrl()
-    Tracking_sc.start()
+    scGear.start()
     move.setup()
-    # switch.switchSetup()
 
     def __init__(self, *args, **kwargs):
         self.CVThreading = 0
@@ -114,16 +90,9 @@ class CVThread(threading.Thread):
         self.center_Pos2 = None
 
         self.center = None
-        
-        self.tracking_servo_left = None
-        self.tracking_servo_left_mark = 0
-        self.tracking_servo_right_mark = 0
-        self.servo_left_stop = 0
-        self.servo_right_stop = 0
 
         super(CVThread, self).__init__(*args, **kwargs)
         self.__flag = threading.Event()
-        # self.__flag = Event()
         self.__flag.clear()
 
         self.avg = None
@@ -154,16 +123,12 @@ class CVThread(threading.Thread):
                 cv2.rectangle(imgInput,(int(self.box_x-self.radius),int(self.box_y+self.radius)),(int(self.box_x+self.radius),int(self.box_y-self.radius)),(255,255,255),1)
 
         elif self.CVMode == 'findlineCV':
-            CVThread.scGear.moveAngle(4, -30) # The camera looks down.
-
             if frameRender:
                 imgInput = cv2.cvtColor(imgInput, cv2.COLOR_BGR2GRAY)
                 '''
                 Image binarization, the method of processing functions can be searched for "threshold" in the link: http://docs.opencv.org/3.0.0/examples.html
                 '''
-                # retval_bw, imgInput =  cv2.threshold(imgInput, 0, 255, cv2.THRESH_OTSU) # THRESH_OTSU:Adaptive Threshold (Dynamic Threshold).flag, use Otsu algorithm to choose the threshold value.
                 retval_bw, imgInput =  cv2.threshold(imgInput, Threshold, 255, cv2.THRESH_BINARY) # Set the threshold manually and set it to 80.
-                # imgInput = cv2.erode(imgInput, None, iterations=6)
                 imgInput = cv2.erode(imgInput, None, iterations=2) #  erode
                 imgInput = cv2.dilate(imgInput, None, iterations=2) # dilate
 
@@ -172,17 +137,6 @@ class CVThread(threading.Thread):
                     cv2.putText(imgInput,('Following White Line'),(30,50), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(128,255,128),1,cv2.LINE_AA)
                 else:
                     cv2.putText(imgInput,('Following Black Line'),(30,50), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(128,255,128),1,cv2.LINE_AA)
-
-                # cv2.line(imgInput,(self.left_Pos1,(linePos_1+30)),(self.left_Pos1,(linePos_1-30)),(255,128,64),1)
-                # cv2.line(imgInput,(self.right_Pos1,(linePos_1+30)),(self.right_Pos1,(linePos_1-30)),(64,128,255),)
-                # cv2.line(imgInput,(0,linePos_1),(640,linePos_1),(255,255,64),1)
-
-                # cv2.line(imgInput,(self.left_Pos2,(linePos_2+30)),(self.left_Pos2,(linePos_2-30)),(255,128,64),1)
-                # cv2.line(imgInput,(self.right_Pos2,(linePos_2+30)),(self.right_Pos2,(linePos_2-30)),(64,128,255),1)
-                # cv2.line(imgInput,(0,linePos_2),(640,linePos_2),(255,255,64),1)
-
-                # cv2.line(imgInput,((self.center-20),int((linePos_1+linePos_2)/2)),((self.center+20),int((linePos_1+linePos_2)/2)),(0,0,0),1)
-                # cv2.line(imgInput,((self.center),int((linePos_1+linePos_2)/2+20)),((self.center),int((linePos_1+linePos_2)/2-20)),(0,0,0),1)
                 
                 imgInput=cv2.merge((imgInput.copy(),imgInput.copy(),imgInput.copy()))
                 cv2.line(imgInput,(self.left_Pos1,(linePos_1+30)),(self.left_Pos1,(linePos_1-30)),(255,128,64),2)
@@ -240,8 +194,6 @@ class CVThread(threading.Thread):
             self.drawing = 1
             
             self.motionCounter += 1
-            #print(motionCounter)
-            #print(text)
             self.lastMovtionCaptured = timestamp
 
         if (timestamp - self.lastMovtionCaptured).seconds >= 0.5:
@@ -249,67 +201,47 @@ class CVThread(threading.Thread):
         self.pause()
 
 
-    # def findLineCtrl(self, posInput, setCenter):
     def findLineCtrl(self, posInput):
-        global findLineMove,tracking_servo_status,FLCV_Status
-        # # if posInput:
-        
-        if FLCV_Status == 0:    # Before video line patrol, initialize the position of the robotic arm.
+        global findLineMove,tracking_servo_status,FLCV_Status        
+        if FLCV_Status == 0:   
             CVThread.scGear.moveAngle(0, 0) 
             CVThread.scGear.moveAngle(1, 0)
             CVThread.scGear.moveAngle(2, 0)
             CVThread.scGear.moveAngle(3, 0)
+            CVThread.scGear.moveAngle(4, 0) 
 
             FLCV_Status = 1
         if posInput != None and findLineMove == 1:
-            # if posInput < 400 and posInput > 250:
-            #     FLCV_Status = 1
-            # elif FLCV_Status != 1:
-            #     pass
             if FLCV_Status == -1:
-                CVThread.Tracking_sc.stopWiggle()
-                self.tracking_servo_left_mark = 0
-                self.tracking_servo_right_mark = 0
+                CVThread.scGear.stopWiggle()
                 FLCV_Status = 1
-            if posInput > 480: # The position of the center of the black line in the screen (value range: 0-640)
-                tracking_servo_status = 1 #  right. -1/0/1: left/mid/right. In which direction the track may be offset out of the tracking area.
-                #turnRight
-                if CVRun:
-                    move.video_Tracking_Move(turn_speed, 1,"right") # 'no'/'right':turn Right, turn_speed：left wheel speed, 0.2:turn_speed*0.2 = right wheel speed
-                else:
-                    move.motorStop() # stop
-
-            elif posInput < 180: # turnLeft.
-                tracking_servo_status = -1 # left
-                if CVRun:
-                    move.video_Tracking_Move(turn_speed, 1,"left") # 'no'/'right':turn Right, turn_speed：left wheel speed, 0.2:turn_speed*0.2 = right wheel speed
-                else:
-                    move.motorStop() # stop.
-                        
+            if posInput > 480: 
+                tracking_servo_status = 1 
+                move.trackingMove(turn_speed, 1,"left")
+            elif posInput < 180: 
+                tracking_servo_status = -1 
+                move.trackingMove(turn_speed, 1,"right")
             else:
-                tracking_servo_status = 0 # mid
-                if CVRun:
-                    move.video_Tracking_Move(turn_speed, 1,"mid")
-                else:
-                    move.motorStop()
+                tracking_servo_status = 0 
+                move.trackingMove(turn_speed, -1,"mid")
                 pass
         
-        else: # Tracking color not found.
-            move.motorStop() # stop.
+        else: 
+            move.motorStop() 
             FLCV_Status = -1
-            if tracking_servo_status == -1 : # -1/0/1: left/mid/right. rotation left.
-                move.video_Tracking_Move(turn_speed, 1,"right")
-            elif tracking_servo_status == 1 : # rotation right
-                move.video_Tracking_Move(turn_speed, 1,"left")
-            else:  # no track ahead. tracking_servo_status==0
+            if tracking_servo_status == -1 : 
+                move.trackingMove(turn_speed, 1,"left")
+            elif tracking_servo_status == 1 : 
+                move.trackingMove(turn_speed, 1,"right")
+            else:  
                 pass
 
 
 
 
     def findlineCV(self, frame_image):
+        global findLineMove
         frame_findline = cv2.cvtColor(frame_image, cv2.COLOR_BGR2GRAY)
-        # retval, frame_findline =  cv2.threshold(frame_findline, 0, 255, cv2.THRESH_OTSU)
         retval, frame_findline =  cv2.threshold(frame_findline, Threshold, 255, cv2.THRESH_BINARY) # Set the threshold manually and set it to 80.
         frame_findline = cv2.erode(frame_findline, None, iterations=2)
         frame_findline = cv2.dilate(frame_findline, None, iterations=2)
@@ -384,7 +316,10 @@ class CVThread(threading.Thread):
             print('No servoPort %d assigned.'%ID)
 
     def findColor(self, frame_image):
-        hsv = cv2.cvtColor(frame_image, cv2.COLOR_BGR2HSV)
+        if APPMode == 'APP':
+            hsv = cv2.cvtColor(frame_image, cv2.COLOR_BGR2RGB)
+        else:
+            hsv = cv2.cvtColor(frame_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, colorLower, colorUpper)#1
         mask = cv2.erode(mask, None, iterations=2)
         mask = cv2.dilate(mask, None, iterations=2)
@@ -401,23 +336,9 @@ class CVThread(threading.Thread):
             Y = int(self.box_y)
             error_Y = 240 - Y
             error_X = 320 - X
-            # CVThread.servoMove(CVThread.P_servo, CVThread.P_direction, error_X)
-            CVThread.servoMove(CVThread.T_servo, CVThread.T_direction, error_Y)
-
-            # if CVThread.X_lock == 1 and CVThread.Y_lock == 1:
-            # if CVThread.Y_lock == 1:
-            #     led.setColor(255,78,0)
-            #     # switch.switch(1,1)
-            #     # switch.switch(2,1)
-            #     # switch.switch(3,1)
-            # else:
-            #     led.setColor(0,78,255)
-            #     # switch.switch(1,0)
-            #     # switch.switch(2,0)
-            #     # switch.switch(3,0)
+            # CVThread.servoMove(CVThread.T_servo, CVThread.T_direction, error_Y)
         else:
             self.findColorDetection = 0
-            # move.motorStop()
         self.pause()
 
 
@@ -439,7 +360,6 @@ class CVThread(threading.Thread):
                 self.CVThreading = 0
             elif self.CVMode == 'findlineCV':
                 self.CVThreading = 1
-                # Camera.CVRunSet(1)
                 self.findlineCV(self.imgCV)
                 self.CVThreading = 0
             elif self.CVMode == 'watchDog':
@@ -450,30 +370,9 @@ class CVThread(threading.Thread):
                 pass
 
 
-
-# class StreamingOutput(io.BufferedIOBase):
-#     def __init__(self):
-#         self.frame = None
-#         self.condition = Condition()
-
-#     def write(self, buf):
-#         with self.condition:
-#             self.frame = buf
-#             self.condition.notify_all()
-
 class Camera(BaseCamera):
     video_source = 0
     modeSelect = 'none'
-    # modeSelect = 'findlineCV'
-    # modeSelect = 'findColor'
-    # modeSelect = 'watchDog'
-
-
-    # def __init__(self):
-        # if os.environ.get('OPENCV_CAMERA_SOURCE'):
-        #     Camera.set_video_source(int(os.environ['OPENCV_CAMERA_SOURCE']))
-        # super(Camera, self).__init__()
-
 
     def colorFindSet(self, invarH, invarS, invarV):
         global colorUpper, colorLower
@@ -499,12 +398,32 @@ class Camera(BaseCamera):
         print(colorUpper)
         print(colorLower)
 
+    def colorFindSetApp(self, invarH, invarS, invarV):
+        global colorUpper, colorLower
+        HUE_1 = invarH+100
+        HUE_2 = invarH-100
+        if HUE_1>255:HUE_1=255
+        if HUE_2<0:HUE_2=0
+
+        SAT_1 = invarS+100
+        SAT_2 = invarS-100
+        if SAT_1>255:SAT_1=255
+        if SAT_2<0:SAT_2=0
+
+        VAL_1 = invarV+100
+        VAL_2 = invarV-100
+        if VAL_1>255:VAL_1=255
+        if VAL_2<0:VAL_2=0
+
+        colorUpper = np.array([HUE_1, SAT_1, VAL_1])
+        colorLower = np.array([HUE_2, SAT_2, VAL_2])
+        print('HSV_1:%d %d %d'%(HUE_1, SAT_1, VAL_1))
+        print('HSV_2:%d %d %d'%(HUE_2, SAT_2, VAL_2))
+        print(colorUpper)
+        print(colorLower)
+
     def modeSet(self, invar):
         Camera.modeSelect = invar
-
-    def CVRunSet(self, invar):
-        global CVRun
-        CVRun = invar
 
     def linePosSet_1(self, invar):
         global linePos_1
@@ -538,57 +457,19 @@ class Camera(BaseCamera):
     def set_video_source(source):
         Camera.video_source = source
 
-
-    # @staticmethod
-    # def frames():
-    #     imshow_flag = False
-
-    #     picam2 = Picamera2()
-    #     preview_config = picam2.preview_configuration
-    #     # preview_config.size = (800, 600)
-    #     preview_config.size = (640, 480)
-    #     preview_config.format = 'RGB888'  # 'XRGB8888', 'XBGR8888', 'RGB888', 'BGR888', 'YUV420'
-    #     hflip = 0
-    #     vflip = 0
-    #     preview_config.transform = libcamera.Transform(hflip=hflip, vflip=vflip)
-    #     preview_config.colour_space = libcamera.ColorSpace.Sycc()
-    #     preview_config.buffer_count = 4
-    #     preview_config.queue = True
-
-    #     try:
-    #         picam2.start()
-    #     except Exception as e:
-    #         print(f"\033[38;5;1mError:\033[0m\n{e}")
-    #         print("\nPlease check whether the camera is connected well,  \
-    #         and disable the \"legacy camera driver\" on raspi-config")
-
-    #     while True:
-    #         start_time = time.time()
-    #         # read current frame
-    #         img = picam2.capture_array()
-
-    #         yield cv2.imencode('.jpg', img)[1].tobytes()
-
-
-# _______________________________________________________
     @staticmethod
     def frames():
         global ImgIsNone,hflip,vflip
         picam2 = Picamera2() 
         
         preview_config = picam2.preview_configuration
-        # preview_config.size = (800, 600)
         preview_config.size = (640, 480)
         preview_config.format = 'RGB888'  # 'XRGB8888', 'XBGR8888', 'RGB888', 'BGR888', 'YUV420'
-        # hflip = 0
-        # vflip = 0
         preview_config.transform = libcamera.Transform(hflip=hflip, vflip=vflip)
         preview_config.colour_space = libcamera.ColorSpace.Sycc()
         preview_config.buffer_count = 4
         preview_config.queue = True
-        # preview_config.framerate = 20
 
-        # if not camera.isOpened():
         if not picam2.is_open:
             raise RuntimeError('Could not start camera.')
 
@@ -604,7 +485,6 @@ class Camera(BaseCamera):
 
         while True:
             start_time = time.time()
-            # read current frame
             img = picam2.capture_array()
 
             if img is None:
@@ -612,18 +492,13 @@ class Camera(BaseCamera):
                     print("--------------------")
                     print("\033[31merror: Unable to read camera data.\033[0m")
                     print("\033[33mIt may be that the Legacy camera is not turned on or the camera is not connected correctly.\033[0m")
-                    print("Open the Legacy camera: Enter in Raspberry Pi\033[34m'sudo raspi-config'\033[0m -->Select\033[34m'3 Interface Options'\033[0m -->\033[34m'I1 Legacy Camera'\033[0m.")
                     print("Use the command: \033[34m'sudo killall python3'\033[0m. Close the self-starting program webServer.py")
-                    print("Use the command: \033[34m'raspistill -t 1000 -o image.jpg'\033[0m to check whether the camera can be used correctly.")
-                    print("Press the keyboard keys \033[34m'Ctrl + C'\033[0m multiple times to exit the current program.")
+                    print("check whether the camera can be used correctly.")
                     print("--------Ctrl+C quit-----------")
                     ImgIsNone = 1
                 continue
-            
-            # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            # print("img1:%d", type(img))
+
             if Camera.modeSelect == 'none':
-                # switch.switch(1,0)
                 cvt.pause()
             else:
                 if cvt.CVThreading:
@@ -637,11 +512,7 @@ class Camera(BaseCamera):
                     img = cvt.elementDraw(img)
                 except:
                     pass
-            
 
-
-            # img = cv2.imdecode(img)
-            # encode as a jpeg image and return it
             if cv2.imencode('.jpg', img)[0]:
                 yield cv2.imencode('.jpg', img)[1].tobytes()
             

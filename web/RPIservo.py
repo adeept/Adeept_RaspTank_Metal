@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # File name   : RPiservo.py
 # Description : Multi-threaded Control Servos
-# Author	  : devin
+
 from __future__ import division
 import time
 from board import SCL, SDA
@@ -9,22 +9,6 @@ import busio
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
 import threading
-import random
-
-
-
-
-# When the motor occupies pins 9-15 on the PCA9685, 
-# the servo can only use pins 0-8.
-
-i2c = busio.I2C(SCL, SDA)
-# Create a simple PCA9685 class instance.
-pwm_servo = PCA9685(i2c, address=0x5f) #default 0x40
-
-pwm_servo.frequency = 50
-
-# pwm_servo = Adafruit_PCA9685.PCA9685()
-# pwm_servo.set_pwm_freq(50)
 
 init_pwm0 = 90
 init_pwm1 = 90
@@ -38,40 +22,26 @@ init_pwm7 = 90
 
 servo_num = 8
 i2c = None
-pwm_servo = None
 
 class ServoCtrl(threading.Thread):
-
     def __init__(self, *args, **kwargs):
-
-
-        
-        # global i2c,pwm_servo
         self.i2c = busio.I2C(SCL, SDA)
         # Create a simple PCA9685 class instance.
         self.pwm_servo = PCA9685(self.i2c, address=0x5f) #default 0x40
-
         self.pwm_servo.frequency = 50
 
-        
         self.sc_direction = [1,1,1,1, 1,1,1,1]
-        # # If motors are not used, 16 servos need to be controlled at the same time.
-        # self.sc_direction = [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] 
         self.initPos = [init_pwm0,init_pwm1,init_pwm2,init_pwm3,
                         init_pwm4,init_pwm5,init_pwm6,init_pwm7]
-        # self.goalPos = [300,300,300,300, 300,300,300,300]
-        # self.nowPos  = [300,300,300,300, 300,300,300,300]
         self.goalPos = [90,90,90,90, 90,90,90,90]
         self.nowPos  = [90,90,90,90, 90,90,90,90]
         self.bufferPos  = [90.0,90.0,90.0,90.0, 90.0,90.0,90.0,90.0]
         self.lastPos = [90,90,90,90, 90,90,90,90]
         self.ingGoal = [90,90,90,90, 90,90,90,90]
-        self.maxPos  = [180,180,180,180, 180,180,180,180]
-        self.minPos  = [0,0,0,0, 0,0,0,0]
+        self.maxPos  = [180,180,180,180, 100,180,180,180]
+        self.minPos  = [0,0,0,85, 75,0,0,0]
         self.scSpeed = [0,0,0,0, 0,0,0,0]
 
-        # self.ctrlRangeMax = 560
-        # self.ctrlRangeMin = 100
         self.ctrlRangeMax = 180
         self.ctrlRangeMin = 0
         self.angleRange = 180
@@ -82,15 +52,9 @@ class ServoCtrl(threading.Thread):
         self.scMode = 'auto'
         self.scTime = 2.0
         self.scSteps = 30
-        # self.scTime = 0.8
-        # self.scSteps = 12
-        
-        # self.scDelay = 0.037
-        # self.scMoveTime = 0.037
         self.scDelay = 0.09
         self.scMoveTime = 0.09
         
-
         self.goalUpdate = 0
         self.wiggleID = 0
         self.wiggleDirection = 1
@@ -99,38 +63,17 @@ class ServoCtrl(threading.Thread):
         self.__flag = threading.Event()
         self.__flag.clear()
 
-    # def setup(self):
-    #     # global i2c,pwm_servo
-    #     self.i2c = busio.I2C(SCL, SDA)
-    #     # Create a simple PCA9685 class instance.
-    #     self.pwm_servo = PCA9685(i2c, address=0x5f) #default 0x40
-
-    #     self.pwm_servo.frequency = 50
-    # 	print("setup")
-
     def set_angle(self,ID, angle):
-        # global i2c,pwm_servo
-        # i2c = busio.I2C(SCL, SDA)
-        # Create a simple PCA9685 class instance.
-        # pwm_servo = PCA9685(i2c, address=0x5f) #default 0x40
-
-        # pwm_servo.frequency = 50
         servo_angle = servo.Servo(self.pwm_servo.channels[ID], min_pulse=500, max_pulse=2400,actuation_range=180)
         servo_angle.angle = angle
 
-
-    # def set_pwm(self):
-        
-    # 	pwm_servo.set_angle(channel, angle)
     def pause(self):
         print('......................pause..........................')
         self.__flag.clear()
 
-
     def resume(self):
         print('resume')
         self.__flag.set()
-
 
     def moveInit(self):
         self.scMode = 'init'
@@ -142,7 +85,6 @@ class ServoCtrl(threading.Thread):
             self.goalPos[i] = self.initPos[i]
         self.pause()
 
-
     def initConfig(self, ID, initInput, moveTo):
         if initInput > self.minPos[ID] and initInput < self.maxPos[ID]:
             self.initPos[ID] = initInput
@@ -150,7 +92,6 @@ class ServoCtrl(threading.Thread):
                 self.set_angle(ID,self.initPos[ID])
         else:
             print('initPos Value Error.')
-
 
     def moveServoInit(self, ID):
         self.scMode = 'init'
@@ -162,25 +103,15 @@ class ServoCtrl(threading.Thread):
             self.goalPos[ID[i]] = self.initPos[ID[i]]
         self.pause()
 
-
     def posUpdate(self):
         self.goalUpdate = 1
         for i in range(0,servo_num):
             self.lastPos[i] = self.nowPos[i]
         self.goalUpdate = 0
 
-    def returnServoAngle(self, ID):
-        # # self.nowPos[ID] = int(self.initPos[ID] + self.sc_direction[ID]*self.pwmGenOut(angleInput))
-        # pwmGenOut_value = int((self.nowPos[ID] - self.initPos[ID] )/self.sc_direction[ID])
-        # # self.pwmGenOut(angleInput) = int(round(((self.ctrlRangeMax-self.ctrlRangeMin)/self.angleRange*angleInput),0))
-        # angle_value = pwmGenOut_value*self.angleRange/((self.ctrlRangeMax-self.ctrlRangeMin))
-        return self.nowPos[ID]
-
-
     def speedUpdate(self, IDinput, speedInput):
         for i in range(0,len(IDinput)):
             self.scSpeed[IDinput[i]] = speedInput[i]
-
 
     def moveAuto(self):
         for i in range(0,servo_num):
@@ -236,7 +167,6 @@ class ServoCtrl(threading.Thread):
 
 
     def pwmGenOut(self, angleInput):
-        # print(int(round(((self.ctrlRangeMax-self.ctrlRangeMin)/self.angleRange*angleInput),0)))
         return int(round(((self.ctrlRangeMax-self.ctrlRangeMin)/self.angleRange*angleInput),0))
 
 
@@ -343,57 +273,14 @@ if __name__ == '__main__':
     
     scGear = ServoCtrl()
     scGear.moveInit()
-    # scGear.start()
-    sc = ServoCtrl()
-    # sc.setup()
-    sc.start()
+    scGear.start()
     
     value = 0
     dir = 1
     while 1:
-        # sc.set_angle(0,0)
-        # sc.set_angle(0,1)
-        # sc.set_angle(0,2)
-        # sc.set_angle(0,3)
-        # time.sleep(1)
-        # sc.set_angle(0,90)
-        # time.sleep(1)
-        # sc.set_angle(0,180)
-        # time.sleep(1)
-
-        # sc.singleServo(7, 1, 1)
-        # time.sleep(3)
-        # sc.singleServo(7, -1, 3)
-        # time.sleep(1)
-        # value = 0
-        # if dir == 1:
-        # 	# sc.set_angle(0,value)
-        # 	sc.moveAngle(1,value)
-        # 	value = value + 1
-        # 	# print("1111")
-        # else:
-        # 	# sc.set_angle(0,value)
-        # 	sc.moveAngle(0,value)
-        # 	value = value - 1
-
-        # if value == 180:
-        # 	dir = -1
-        # elif value == 0:
-        # 	dir = 1
-        # time.sleep(0.01)		
-        # time.sleep(1)
-        # sc.singleServo(0, 1, 10)
         scGear.moveAngle(1, -50)
         time.sleep(1)
         # sc.singleServo(0, -1, 10)
         scGear.moveAngle(1, 50)
         time.sleep(1)
-        # sc.stopWiggle()
-        # scGear.stopWiggle()
-        # time.sleep(1)
-        # sc.singleServo(1, 1, 1)
-        # sc.singleServo(1, 1, 1)
-        # time.sleep(1)
-
-        # moveAngle stopWiggle singleServo
 

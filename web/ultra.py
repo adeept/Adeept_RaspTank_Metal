@@ -2,8 +2,6 @@
 # File name   : Ultrasonic.py
 # Description : Detection distance and tracking with ultrasonic
 # Website     : www.adeept.com
-# Author      : Devin
-# Date        : 2024/03/10
 
 from gpiozero import DistanceSensor
 from time import sleep

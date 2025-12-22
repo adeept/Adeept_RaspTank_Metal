@@ -19,14 +19,20 @@ import ast
 import FPV
 import json
 import Voltage
-mark_test = 0
+import subprocess
 
 speed_set = 25
-turnWiggle = 60
 
-direction_command = 'no'
-turn_command = 'no'
-
+OLED_connection = 1
+try:
+    import OLED
+    screen = OLED.OLED_ctrl()
+    screen.start()
+    screen.screen_show(1, 'ADEEPT.COM')
+except:
+    OLED_connection = 0
+    print('OLED disconnected\n')
+    pass
 
 scGear = RPIservo.ServoCtrl()
 scGear.moveInit()
@@ -59,39 +65,27 @@ def servoPosInit():
     scGear.initConfig(4,init_pwm[4],1)
 
 
-def replace_num(initial,new_num):   #Call this function to replace data in '.txt' file
-    global r
-    newline=""
-    str_num=str(new_num)
-    with open(thisPath+"/RPIservo.py","r") as f:
-        for line in f.readlines():
-            if(line.find(initial) == 0):
-                line = initial+"%s" %(str_num+"\n")
-            newline += line
-    with open(thisPath+"/RPIservo.py","w") as f:
-        f.writelines(newline)
-
-
 def FPV_thread():
     global fpv
     fpv=FPV.FPV()
     fpv.capture_thread(addr[0])
 
-
-def ap_thread():
-    os.system("sudo create_ap wlan0 eth0 Adeept_Robot 12345678")
-
-
 def functionSelect(command_input, response):
     if 'findColor' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'FindColor')
         fpv.FindColor(1)
         tcpCliSock.send(('FindColor').encode())
 
     elif 'motionGet' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'MotionGet')
         fpv.WatchDog(1)
         tcpCliSock.send(('WatchDog').encode())
 
     elif 'stopCV' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'FUNCTION OFF')
         fpv.FindColor(0)
         fpv.WatchDog(0)
         FPV.FindLineMode = 0
@@ -102,22 +96,34 @@ def functionSelect(command_input, response):
         switch.switch(3,0)
 
     elif 'police' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'POLICE')
         ws2812.police()
 
     elif 'policeOff' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'FUNCTION OFF')
         ws2812.breath(70,70,255)
 
     elif 'automatic' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'Automatic')
         fuc.automatic()
 
     elif 'automaticOff' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'FUNCTION OFF')
         fuc.pause()
 
     elif 'trackLine' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'TrackLine')
         servoPosInit()
         fuc.trackLine()
 
     elif 'trackLineOff' == command_input:
+        if OLED_connection:
+            screen.screen_show(4,'FUNCTION OFF')
         fuc.pause()
 
 
@@ -142,29 +148,22 @@ def switchCtrl(command_input):
 
 
 def robotCtrl(command_input):
-    global direction_command, turn_command
     if 'forward' == command_input:
-        direction_command = 'forward'
         move.move(speed_set, -1, "mid")
     
     elif 'backward' == command_input:
-        direction_command = 'backward'
         move.move(speed_set, 1, "mid")
 
     elif 'DS' in command_input:
-        direction_command = 'no'
         move.motorStop()
 
     elif 'left' == command_input:
-        turn_command = 'left'
         move.move(speed_set, 1, "left")
 
     elif 'right' == command_input:
-        turn_command = 'right'
         move.move(speed_set, 1, "right")
 
     elif 'TS' in command_input:
-        turn_command = 'no'
         move.motorStop()
 
     elif 'armUp' == command_input:
@@ -274,31 +273,6 @@ def configPWM(command_input):
             scGear.moveAngle(i, 0)
 
 
-
-def wifi_check():
-    global mark_test
-    try:
-        time.sleep(3)
-        s =socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-        s.connect(("1.1.1.1",80))
-        ipaddr_check=s.getsockname()[0]
-        s.close()
-        print(ipaddr_check)
-        mark_test = 1  
-    except:
-        if mark_test == 1:
-            mark_test = 0
-            move.destroy()      # motor stop.
-            scGear.moveInit()   # servo  back initial position.
-
-        ap_threading=threading.Thread(target=ap_thread)   #Define a thread for data receiving
-        ap_threading.setDaemon(True)                          #'True' means it is a front thread,it would close when the mainloop() closes
-        ap_threading.start()                                  #Thread starts
-        ws2812.set_all_led_color_data(35,255,35)
-        ws2812.show()
-
-
-
 def recv_msg(tcpCliSock):
     global speed_set
     move.setup()
@@ -309,22 +283,15 @@ def recv_msg(tcpCliSock):
             'title' : '',
             'data' : None
         }
-
-
         data = tcpCliSock.recv(BUFSIZ).decode()
         print(data)
 
         if not data:
             continue
-
-
         if isinstance(data,str):
             robotCtrl(data)
-
             switchCtrl(data)
-
             functionSelect(data, response)
-
             configPWM(data)
 
             if 'get_info' == data:
@@ -383,20 +350,44 @@ def recv_msg(tcpCliSock):
         response = json.dumps(response)
         tcpCliSock.sendall(response.encode())
 
-def test_Network_Connection():
-    while True:
-        try:
-            s =socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-            s.connect(("1.1.1.1",80))
-            s.close()
-        except:
-            move.destroy()
-        
-        time.sleep(0.5)
+def show_wlan0_ip():
+    try:
+        if OLED_connection:
+            result = subprocess.run(
+                "ifconfig wlan0 | grep 'inet ' | awk '{print $2}'",
+                shell=True,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                encoding='utf-8'
+            ) 
+            screen.screen_show(2, "IP:" + result.stdout.strip())
+    except Exception as e:
+        pass
+
+def show_network_mode():
+    try:
+        if OLED_connection:
+            result = subprocess.run(
+                "if iw dev wlan0 link | grep -q 'Connected'; then echo 'Station Mode'; else echo 'AP Mode'; fi",
+                shell=True,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                encoding='utf-8'
+            )
+            screen.screen_show(3, result.stdout.strip())
+    except Exception as e:
+        pass
+
 
 if __name__ == '__main__':
     switch.switchSetup()
-    switch.set_all_switch_off()                                  
+    switch.set_all_switch_off()       
+
+    show_wlan0_ip()
+    time.sleep(0.5)
+    show_network_mode()                           
 
     ws2812=robotLight.Adeept_SPI_LedPixel(16, 255)
     try:
@@ -412,8 +403,6 @@ if __name__ == '__main__':
     BUFSIZ = 1024                             #Define buffer size
     ADDR = (HOST, PORT)
 
-   
-    wifi_check()
     try:                  #Start server,waiting for client
         tcpSerSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcpSerSock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)

@@ -7,9 +7,7 @@ from flask_cors import *
 
 from camera_opencv import Camera
 import threading
-
-# Raspberry Pi camera module (requires picamera package)
-# from camera_pi import Camera
+import camera_opencv
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -65,8 +63,14 @@ class webapp:
     def modeselect(self, modeInput):
         Camera.modeSelect = modeInput
 
+    def modeselectApp(self, modeInput):
+        camera_opencv.APPMode = modeInput
+
     def colorFindSet(self, H, S, V):
         camera.colorFindSet(H, S, V)
+
+    def colorFindSetApp(self, H, S, V):
+        camera.colorFindSetApp(H, S, V)
 
     def thread(self):
         app.run(host='0.0.0.0', port=5000,threaded=True)

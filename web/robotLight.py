@@ -1,35 +1,13 @@
 #!/usr/bin/env python3
-# File name   : servo.py
+# File name   : robotLight.py
 # Description : Control lights
-# Author	  : William
-# Date		: 2019/02/23
+
 import time
 import sys
 from gpiozero import PWMOutputDevice as PWM
 import threading
 import spidev
 import numpy
-from numpy import sin, cos, pi
-def check_rpi_model():
-    _, result = run_command("cat /proc/device-tree/model |awk '{print $3}'")
-    result = result.strip()
-    if result == '3':
-        return 3
-    elif result == '4':
-        return 4
-    elif result == '5':
-        return 5
-    else:
-        return None
-
-def run_command(cmd=""):
-    import subprocess
-    p = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    result = p.stdout.read().decode('utf-8')
-    status = p.poll()
-    return status, result
-
 
 def map(x, in_min, in_max, out_min, out_max):
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
@@ -41,11 +19,17 @@ class Adeept_SPI_LedPixel(threading.Thread):
         self.set_led_brightness(bright)
         self.led_begin(bus, device)
         self.lightMode = 'none'
+
+        self.rainbow_r = 0
+        self.rainbow_g = 0
+        self.rainbow_b = 0
         self.colorBreathR = 0
         self.colorBreathG = 0
         self.colorBreathB = 0
+        self.colorFlowingR = 0
+        self.colorFlowingG = 0
+        self.colorFlowingB = 0
         self.breathSteps = 10
-        #self.spi_gpio_info()
         self.set_all_led_color(0,0,0)
         super(Adeept_SPI_LedPixel, self).__init__(*args, **kwargs)
         self.__flag = threading.Event()
@@ -162,15 +146,6 @@ class Adeept_SPI_LedPixel(threading.Thread):
         d = numpy.array(self.led_color).ravel()        #Converts data into a one-dimensional array
         tx = numpy.zeros(len(d)*8, dtype=numpy.uint8)  #Each RGB color has 8 bits, each represented by a uint8 type data
         for ibit in range(8):                          #Convert each bit of data to the data that the spi will send
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x3E + 0xC0   #T0H=2,T0L=6, T1H=7,T1L=1   #0b11111110 mean T1(1.09375us), 0b11000000 mean T0(0.3125us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x3C + 0xC0   #T0H=2,T0L=6, T1H=6,T1L=2   #0b11111100 mean T1(0.9375us),  0b11000000 mean T0(0.3125us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x38 + 0xC0   #T0H=2,T0L=6, T1H=5,T1L=3   #0b11111000 mean T1(0.78125us), 0b11000000 mean T0(0.3125us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x30 + 0xC0   #T0H=2,T0L=6, T1H=4,T1L=4   #0b11110000 mean T1(0.625us),   0b11000000 mean T0(0.3125us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x20 + 0xC0   #T0H=2,T0L=6, T1H=3,T1L=5   #0b11100000 mean T1(0.46875us), 0b11000000 mean T0(0.3125us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x7E + 0x80   #T0H=1,T0L=7, T1H=7,T1L=1   #0b11111110 mean T1(0.09375us), 0b10000000 mean T0(0.15625us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x78 + 0x80   #T0H=1,T0L=7, T1H=5,T1L=3   #0b11111000 mean T1(0.78125us), 0b10000000 mean T0(0.15625us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x70 + 0x80   #T0H=1,T0L=7, T1H=4,T1L=4   #0b11110000 mean T1(0.625us),   0b10000000 mean T0(0.15625us)
-            #tx[7-ibit::8]=((d>>ibit)&1)*0x60 + 0x80   #T0H=1,T0L=7, T1H=3,T1L=5   #0b11100000 mean T1(0.46875us), 0b10000000 mean T0(0.15625us)
             tx[7-ibit::8]=((d>>ibit)&1)*0x78 + 0x80    #T0H=1,T0L=7, T1H=5,T1L=3   #0b11111000 mean T1(0.78125us), 0b10000000 mean T0(0.15625us)  
         if self.led_init_state != 0:
             if self.bus == 0:
@@ -249,11 +224,23 @@ class Adeept_SPI_LedPixel(threading.Thread):
         self.colorBreathG = G_input
         self.colorBreathB = B_input
         self.resume()    
+    
+    def rainbow(self, R_input, G_input, B_input):
+        self.lightMode = 'rainbow'
+        self.rainbow_r = R_input
+        self.rainbow_g = G_input
+        self.rainbow_b = B_input
+        self.resume()
+
+    def flowing(self, R_input, G_input, B_input):
+        self.lightMode = 'flowing'
+        self.colorFlowingR = R_input
+        self.colorFlowingG = G_input
+        self.colorFlowingB = B_input
+        self.resume()
             
     def resume(self):
         self.__flag.set()
-
-
 
     def pause(self):
         self.lightMode = 'none'
@@ -266,14 +253,13 @@ class Adeept_SPI_LedPixel(threading.Thread):
                 if self.lightMode != 'breath':
                     break
                 self.set_all_led_color(self.colorBreathR*i/self.breathSteps, self.colorBreathG*i/self.breathSteps, self.colorBreathB*i/self.breathSteps)
-                #self.show()
                 time.sleep(0.03)
             for i in range(0,self.breathSteps):
                 if self.lightMode != 'breath':
                     break
                 self.set_all_led_color(self.colorBreathR-(self.colorBreathR*i/self.breathSteps), self.colorBreathG-(self.colorBreathG*i/self.breathSteps), self.colorBreathB-(self.colorBreathB*i/self.breathSteps))
-                #self.show()
                 time.sleep(0.03)
+
     def policeProcessing(self):
         while self.lightMode == 'police':
             for i in range(0,3):
@@ -294,7 +280,32 @@ class Adeept_SPI_LedPixel(threading.Thread):
                 self.show()
                 time.sleep(0.05)
             time.sleep(0.1)
-            
+
+
+    def rainbowProcessing(self):
+        while self.lightMode == 'rainbow':
+            for i in range(self.led_count):
+                self.rainbow_r = self.rainbow_r + i * 10
+                self.rainbow_g = self.rainbow_g + i * 10
+                self.rainbow_b = self.rainbow_b + i * 10
+                if self.rainbow_r > 255:
+                    self.rainbow_r -= 255
+                if self.rainbow_g > 255:
+                    self.rainbow_g -= 255
+                if self.rainbow_b > 255:
+                    self.rainbow_b -= 255
+                self.set_led_color(i, self.rainbow_r,self.rainbow_g,self.rainbow_b)
+                self.show()
+                self.lightMode = 'none'
+
+    def flowingProcessing(self):
+        while self.lightMode == 'flowing':
+            self.set_all_led_rgb_data([0, 0, 0])
+            for i in range(self.led_count):
+                self.set_led_color(i, self.colorFlowingR,self.rainbow_g,self.colorFlowingR)
+                time.sleep(0.2)
+                self.show()
+            time.sleep(0.2)            
             
     def lightChange(self):
         if self.lightMode == 'none':
@@ -303,155 +314,16 @@ class Adeept_SPI_LedPixel(threading.Thread):
             self.policeProcessing()
         elif self.lightMode == 'breath':
             self.breathProcessing()    
-    
+        elif self.lightMode == 'rainbow':
+            self.rainbowProcessing()
+        elif self.lightMode == 'flowing':
+            self.flowingProcessing()
+
     def run(self):
         while 1:
             self.__flag.wait()
             self.lightChange()
             pass
-
-
-
-class RobotLight(threading.Thread):
-    def __init__(self, *args, **kwargs):
-
-        self.left_R = 7
-        self.left_G = 0
-        self.left_B = 8
-
-        self.right_R = 5
-        self.right_G = 6
-        self.right_B = 1
-        
-        self.Left_G = PWM(pin=self.left_R,initial_value=1.0, frequency=2000)
-        self.Left_B = PWM(pin=self.left_G,initial_value=1.0, frequency=2000)
-        self.Left_R = PWM(pin=self.left_B,initial_value=1.0, frequency=2000)
-        
-        self.Right_G = PWM(pin=self.right_R,initial_value=1.0, frequency=2000)
-        self.Right_B = PWM(pin=self.right_G,initial_value=1.0, frequency=2000)
-        self.Right_R = PWM(pin=self.right_B,initial_value=1.0, frequency=2000)
-
-        # super(RobotLight, self).__init__(*args, **kwargs)
-        # self.__flag = threading.Event()
-        # self.__flag.clear()
-
-    # def setColorLED(self,LED_num, col):   # For example : col = 0x112233
-    #     if LED_num ==1 :
-    #         R_val = (col & 0xff0000) >> 16
-    #         G_val = (col & 0x00ff00) >> 8
-    #         B_val = (col & 0x0000ff) >> 0
-            
-    #         R_val = map(R_val, 0, 255, 0, 1.00)
-    #         G_val = map(G_val, 0, 255, 0, 1.00)
-    #         B_val = map(B_val, 0, 255, 0, 1.00)
-
-    #         self.Left_R.value = 1.0-R_val
-    #         self.Left_G.value = 1.0-G_val
-    #         self.Left_B.value = 1.0-B_val
-    #     elif LED_num == 2:
-    #         R_val = (col & 0xff0000) >> 16
-    #         G_val = (col & 0x00ff00) >> 8
-    #         B_val = (col & 0x0000ff) >> 0
-            
-    #         R_val = map(R_val, 0, 255, 0, 1.00)
-    #         G_val = map(G_val, 0, 255, 0, 1.00)
-    #         B_val = map(B_val, 0, 255, 0, 1.00)
-
-    #         self.Right_R.value = 1.0-R_val
-    #         self.Right_G.value = 1.0-G_val
-    #         self.Right_B.value = 1.0-B_val
-
-    def setRGBColor(self,LED_num, R,G,B):   # For example : (1,  255,0,0)
-        if LED_num ==1 :
-            R_val = map(R, 0, 255, 0, 1.00)
-            G_val = map(G, 0, 255, 0, 1.00)
-            B_val = map(B, 0, 255, 0, 1.00)
-            self.Left_R.value = 1.0-R_val
-            self.Left_G.value = 1.0-G_val
-            self.Left_B.value = 1.0-B_val
-
-        elif LED_num == 2:
-            R_val = map(R, 0, 255, 0, 1.00)
-            G_val = map(G, 0, 255, 0, 1.00)
-            B_val = map(B, 0, 255, 0, 1.00)
-            self.Right_R.value = 1.0-R_val
-            self.Right_G.value = 1.0-G_val
-            self.Right_B.value = 1.0-B_val
-
-    def both_on(self,R,G,B):
-        self.setRGBColor(1, R,G,B)
-        self.setRGBColor(2, R,G,B)
-
-    def RGB_left_on(self,R,G,B):
-        self.setRGBColor(1, R,G,B)
-        self.setRGBColor(2, 0,0,0)
-
-    def RGB_right_on(self,R,G,B):
-        self.setRGBColor(1, 0,0,0)
-        self.setRGBColor(2, R,G,B)
-
-    def both_off(self):
-        self.setRGBColor(1, 0,0,0)
-        self.setRGBColor(2, 0,0,0)
-
-    # def pause(self):
-    #     self.lightMode = 'none'
-    #     self.setColor(0,0,0)
-    #     self.__flag.clear()
-
-    # def resume(self):
-    #     self.__flag.set()
-
-
-
-    # def frontLight(self, switch):
-    #     if switch == 'on':
-    #         GPIO.output(6, GPIO.HIGH)
-    #         GPIO.output(13, GPIO.HIGH)
-    #     elif switch == 'off':
-    #         GPIO.output(5,GPIO.LOW)
-    #         GPIO.output(13,GPIO.LOW)
-
-
-    # def switch(self, port, status):
-    #     if port == 1:
-    #         if status == 1:
-    #             GPIO.output(5, GPIO.HIGH)
-    #         elif status == 0:
-    #             GPIO.output(5,GPIO.LOW)
-    #         else:
-    #             pass
-    #     elif port == 2:
-    #         if status == 1:
-    #             GPIO.output(6, GPIO.HIGH)
-    #         elif status == 0:
-    #             GPIO.output(6,GPIO.LOW)
-    #         else:
-    #             pass
-    #     elif port == 3:
-    #         if status == 1:
-    #             GPIO.output(13, GPIO.HIGH)
-    #         elif status == 0:
-    #             GPIO.output(13,GPIO.LOW)
-    #         else:
-    #             pass
-    #     else:
-    #         print('Wrong Command: Example--switch(3, 1)->to switch on port3')
-
-
-    # def set_all_switch_off(self):
-    #     self.switch(1,0)
-    #     self.switch(2,0)
-    #     self.switch(3,0)
-
-
-    # def headLight(self, switch):
-    #     if switch == 'on':
-    #         GPIO.output(5, GPIO.HIGH)
-    #     elif switch == 'off':
-    #         GPIO.output(5,GPIO.LOW)
-
-
 
 if __name__ == '__main__':
     import time

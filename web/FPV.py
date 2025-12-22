@@ -237,11 +237,6 @@ class FPV:
             invar = 25
         elif invar < -25:
             invar = -25
-        else:
-            camera.exposure_compensation = invar
-
-    def defaultExpCom(self): 
-        camera.exposure_compensation = 0
 
     def colorFindSet(self, invarH, invarS, invarV):
         global colorUpper, colorLower

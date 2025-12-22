@@ -1,15 +1,10 @@
-#!/usr/bin/env/python
+#!/usr/bin/env/python3
 # File name   : switch.py
 # Website     : www.Adeept.com
-# Author      : Devin
-# Date        : 2024/03/10
+
 
 import time
-
 from gpiozero import LED
-
-# led = LED(17)
-# led.on()
 
 def switchSetup():
     global led1,led2,led3

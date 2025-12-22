@@ -1,50 +1,27 @@
 #!/usr/bin/env python3
 # File name   : functions.py
 # Description : Control Functions
-# Author	  : Devin
-# Date		: 2024/03/10
-import time
-from board import SCL, SDA
-import busio
-from adafruit_motor import servo
-from adafruit_pca9685 import PCA9685
 
+import time
 import threading
-# from mpu6050 import mpu6050
 import os
-import json
 import ultra
 import Kalman_filter
 import move
-# import speech
 import RPIservo
 from gpiozero import InputDevice
+last_status = 0
 
 scGear = RPIservo.ServoCtrl()
-# scGear.setup()
 scGear.start()
-# i2c = busio.I2C(SCL, SDA)
-# # Create a simple PCA9685 class instance.
-# pwm_fuc_servo = PCA9685(i2c, address=0x5f) #default 0x40
-# pwm_fuc_servo.frequency = 50
-
-TL_Speed = 30
-auto_speed = 50
+TL_Speed = 40
+auto_speed = 55
 move.setup()
-kalman_filter_X =  Kalman_filter.Kalman_filter(0.01,0.1)
-
-# MPU_connection = 1
-# try:
-# 	sensor = mpu6050(0x68)
-# 	print('mpu6050 connected, PT MODE ON')
-# except:
-# 	MPU_connection = 0
-# 	print('mpu6050 disconnected, ARM MODE ON')
 
 curpath = os.path.realpath(__file__)
 thisPath = "/" + os.path.dirname(curpath)
 
-def num_import_int(initial):        #Call this function to import data from '.txt' file
+def num_import_int(initial):       
 	global r
 	with open(thisPath+"/RPIservo.py") as f:
 		for line in f.readlines():
@@ -78,8 +55,6 @@ line_pin_middle = 27
 line_pin_right = 17
 
 
-
-
 class Functions(threading.Thread):
 	def __init__(self, *args, **kwargs):
 		self.functionMode = 'none'
@@ -89,7 +64,7 @@ class Functions(threading.Thread):
 		self.scanList = [0,0,0]
 		self.scanPos = 1
 		self.scanDir = 1
-		self.rangeKeep = 0.7
+		self.rangeKeep = 30
 		self.scanRange = 100
 		self.scanServo = 1
 		self.turnServo = 2
@@ -99,90 +74,60 @@ class Functions(threading.Thread):
 		self.__flag = threading.Event()
 		self.__flag.clear()
 
-	def pwmGenOut(self, angleInput):
-		# return int(round(23/9*angleInput))
-		return int(angleInput)
-
 	def setup(self):
 		global track_line_left, track_line_middle,track_line_right
-		track_line_left = InputDevice(pin=line_pin_right)
+		track_line_left = InputDevice(pin=line_pin_left)
 		track_line_middle = InputDevice(pin=line_pin_middle)
-		track_line_right = InputDevice(pin=line_pin_left)
-
-	def radarScan(self):
-		# global pwm0_pos,pwm0_max
-		pwm0_min = -90
-		pwm0_max =  90
-		scan_speed = 1
-		result = []
-		pwm0_pos = pwm0_max
-		scGear.moveAngle(1, 0)
-		scGear.moveAngle(0, 0)
-		time.sleep(0.8)
-
-		while pwm0_pos>pwm0_min:
-			pwm0_pos-=scan_speed
-			scGear.moveAngle(1, pwm0_pos)
-			scGear.moveAngle(0, pwm0_pos)
-			dist = ultra.checkdist()
-			if dist > 200:
-				continue
-			theta = 90 + pwm0_pos 
-			result.append([dist, theta])
-			time.sleep(0.02)
-	
-		scGear.set_angle(1, 0)
-		return result
-
+		track_line_right = InputDevice(pin=line_pin_right)
 
 	def pause(self):
 		self.functionMode = 'none'
 		move.motorStop()
 		self.__flag.clear()
 
-
 	def resume(self):
 		self.__flag.set()
 
-
 	def automatic(self):
-		# print("aaa")
 		self.functionMode = 'Automatic'
 		self.resume()
-
 
 	def trackLine(self):
 		self.functionMode = 'trackLine'
 		self.resume()
 
-
 	def keepDistance(self):
 		self.functionMode = 'keepDistance'
 		self.resume()
 
-
-	def steady(self,goalPos):
-		self.functionMode = 'Steady'
-		self.steadyGoal = goalPos
-		self.resume()
-
-
-
 	def trackLineProcessing(self):
+		global last_status
 		status_right = track_line_right.value
 		status_middle = track_line_middle.value
 		status_left = track_line_left.value
+		current_status = (status_left << 2) | (status_middle << 1) | status_right
+
+		if last_status == current_status:
+			return
+
+		last_status = current_status
+
 		if status_middle == 0:
-			move.trackingMove(TL_Speed,-1,"mid")
-		elif status_left == 0:
-			move.trackingMove(TL_Speed,1,"left")
-		elif status_right == 0:
-			move.trackingMove(TL_Speed,1,"right")
+			if status_left == 0 and status_right == 1:    # 0 0 1   right
+				move.trackingMove(TL_Speed,1,"right")
+			elif status_left == 1 and status_right == 0:  # 1 0 0 left
+				move.trackingMove(TL_Speed,1,"left")
+			else:									 # 0 0 0 or 1 0 1
+				move.trackingMove(TL_Speed,-1,"mid")
 		else:
-			move.trackingMove(TL_Speed,-1,"no")
+			if status_left == 0 and status_right == 1:	#011
+				move.trackingMove(TL_Speed,1,"right")
+			elif status_left == 1 and status_right == 0:	#110
+				move.trackingMove(TL_Speed,1,"left")
+			else:	#010 or 111
+				move.trackingMove(TL_Speed,-1,"mid")
 		print(status_left,status_middle,status_right)
 		time.sleep(0.1)
-
 
 
 	def distRedress(self): 
@@ -201,61 +146,49 @@ class Functions(threading.Thread):
 		print('automaticProcessing')
 		dist = self.distRedress()
 		print(dist, "cm")
-		time.sleep(0.2)
-		if dist >= 40:			# More than 40CM, go straight.
+		if dist >= 40:			
 			move.move(auto_speed, -1, "mid")
-			print("Forward")
-		elif dist > 20 and dist < 40:	
-			move.move(auto_speed, 1, "left")
 			time.sleep(0.2)
+		elif dist > 20 and dist < 40:	
+			distMid = self.distRedress()
+			self.scanList[2] = distMid
+			move.move(auto_speed, 1, "left")
+			time.sleep(0.5)
 			distLeft = self.distRedress()
 			self.scanList[0] = distLeft
+			if self.scanList[0] > self.scanList[2]:
+				move.move(auto_speed, -1, "mid")
+				time.sleep(0.2)
+
 			move.move(auto_speed, 1, "right")
-			time.sleep(0.4)
+			time.sleep(1)
 			distRight = self.distRedress()
 			self.scanList[1] = distRight
-			print(self.scanList)
-			if self.scanList[0] >= self.scanList[1]:
-				move.move(auto_speed,1,"left")
-				print("Left")
-				time.sleep(0.5)
-			else:
-				move.move(auto_speed, 1, "right")
-				print("Right")
+			if self.scanList[1] > self.scanList[2]:
+				move.move(auto_speed, -1, "mid")
 				time.sleep(0.2)
-		else:		# The distance is less than 20cm, back.
+		else:		
 			move.move(auto_speed, 1, "mid")
 			print("Back")
 			time.sleep(0.4)
 
-
-
 	def keepDisProcessing(self):
-		# print('keepDistanceProcessing')
-		distanceGet = ultra.checkdist()
-		if distanceGet > (self.rangeKeep/2+0.1):
-			move.move(TL_Speed, 1, "mid")
-		elif distanceGet < (self.rangeKeep/2-0.1):
-			move.move(TL_Speed, -1, "mid")
-		else:
-			move.motorStop()
-
+		distanceGet = self.distRedress()
+		if distanceGet >= self.rangeKeep:
+			move.move(auto_speed, -1, "mid")
+		elif distanceGet < self.rangeKeep:
+			move.move(auto_speed, 1, "mid")
+		time.sleep(0.2)
 
 	def functionGoing(self):
 		if self.functionMode == 'none':
 			self.pause()
 		elif self.functionMode == 'Automatic':
 			self.automaticProcessing()
-			# print("aaa")
-		elif self.functionMode == 'Steady':
-			self.steadyProcessing()
 		elif self.functionMode == 'trackLine':
 			self.trackLineProcessing()
-		# elif self.functionMode == 'speechRecProcessing':
-		# 	self.speechRecProcessing()
 		elif self.functionMode == 'keepDistance':
 			self.keepDisProcessing()
-
 
 	def run(self):
 		while 1:
@@ -265,23 +198,10 @@ class Functions(threading.Thread):
 
 
 if __name__ == '__main__':
-	pass
 	try:
 		fuc=Functions()
 		fuc.setup()
 		while True:
-			# fuc.radarScan()
-			# fuc.start()
-			# print("qqq")
-			# fuc.automaticProcessing()
-			# print("www")
-			# fuc.trackLineProcessing()
 			fuc.keepDisProcessing()
-			# # fuc.steady(300)
-			# time.sleep(30)
-			# fuc.pause()
-			# time.sleep(1)
-			# move.move(TL_Speed, 'no', 'no', 0.5)
 	except KeyboardInterrupt:
-
 			move.motorStop()

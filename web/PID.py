@@ -52,25 +52,3 @@ class PID:
         self.prev_error = error
 
         return self.Cp + (self.Ki*self.Ci) + (self.Kd*self.Cd)
-'''
-pid = PID()
-pid.SetKp(Kp)
-pid.SetKd(Kd)
-pid.SetKi(Ki)
-
-fb = 0
-outv = 0
-
-PID_loop = True
-
-while PID_loop:
-    error = Sp - fb
-
-    outv = pid.GenOut(error)
-    AnalogOut(outv)
-
-    time.sleep(0.05)
-
-    fb = AnalogIn(fb_input)
-    pass
-'''

@@ -9,7 +9,7 @@ import subprocess
 
 
 username = os.popen("echo ${SUDO_USER:-$(who -m | awk '{ print $1 }')}").readline().strip() # pi
-user_home = os.popen('getent passwd %s | cut -d: -f 6'%username).readline().strip()         # home
+user_home = os.popen(f'getent passwd {username} | cut -d: -f 6').readline().strip()        # home
  
 curpath = os.path.realpath(__file__)
 thisPath = "/" + os.path.dirname(curpath)
@@ -144,18 +144,18 @@ else:
 wifi_service_name="wifi-hotspot-manager.service"
 if not check_systemctl_service(wifi_service_name):
     # wifi and hotspot switch script
-    os.system(f"sudo cp {thisPath}/wifi_hotspot_manager.sh /home/pi")
-    os.system("sudo chmod +x /home/pi/wifi_hotspot_manager.sh")
+    os.system(f"sudo cp {thisPath}/wifi_hotspot_manager.sh {user_home}")
+    os.system(f"sudo chmod +x {user_home}/wifi_hotspot_manager.sh")
 
 
-    wifi_service_content="""[Unit]
+    wifi_service_content=f"""[Unit]
 Description=WiFi and Hotspot Manager Service
 After=network.target NetworkManager.service
 Wants=NetworkManager.service
 
 [Service]
 Type=oneshot
-ExecStart=/home/pi/wifi_hotspot_manager.sh  
+ExecStart={user_home}/wifi_hotspot_manager.sh  
 User=root
 RemainAfterExit=yes
 
@@ -189,13 +189,13 @@ robot_service_name="Adeept_Robot.service"
 if not check_systemctl_service(robot_service_name):
     # auto start script
     try:
-        os.system("sudo touch /"+ user_home +"/startup.sh")
-        with open("/"+ user_home +"/startup.sh",'w') as file_to_write:
+        os.system(f"sudo touch {user_home}/startup.sh")
+        with open(f"{user_home}/startup.sh",'w') as file_to_write:
             #you can choose how to control the robot
-            file_to_write.write("#!/bin/sh\nsleep 5\nsudo python3 " + thisPath + "/Server/WebServer.py")
+            file_to_write.write(f"#!/bin/sh\nsleep 5\nsudo python3  {thisPath}/Server/WebServer.py")
     except:
         pass
-    os.system("sudo chmod 777 /"+ user_home +"/startup.sh")
+    os.system(f"sudo chmod 777 {user_home}/startup.sh")
 
     #config systemctl service
     # Define the content of the systemd service file
@@ -206,8 +206,8 @@ After={wifi_service_name}
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/pi
-ExecStart=/home/pi/startup.sh  
+WorkingDirectory={user_home}
+ExecStart={user_home}/startup.sh  
 Restart=no
 
 [Install]

@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Configuration parameters - modify these values according to your needs
-SYSTEM_WIFI_CONN="preconfigured"  # Default connection name for Bookworm system
+# SYSTEM_WIFI_CONN="preconfigured"  # Default connection name for Bookworm system
 HOTSPOT_SSID="Adeept_Robot"
+SYSTEM_WIFI_CONN=$(nmcli connection show | grep -w "wifi" | grep -v "$HOTSPOT_SSID" | awk '{print $1}')  # Default connection name for Bookworm and Trixie system
 HOTSPOT_PASSWORD="12345678"  # At least 8 characters
 HOTSPOT_INTERFACE="wlan0"
 WIFI_AP_GATEWAY="192.168.4.1"
@@ -12,12 +13,6 @@ echo "Waiting for network service to start..."
 while ! nmcli general status > /dev/null 2>&1; do
     sleep 1
 done
-
-#update connection name for Bookworm or Trixie
-get_system_wifi_conn() {
-    nmcli connection show | grep -E 'preconfigured|netplan' | awk '{print $1}'
-}
-SYSTEM_WIFI_CONN=$(get_system_wifi_conn)
 
 # Check WiFi connection status (for preconfigured connection)
 check_wifi_connection() {
@@ -41,12 +36,12 @@ connect_wifi() {
         echo "Error: System preconfigured connection $SYSTEM_WIFI_CONN does not exist"
         return 1
     fi
-    
+
     # Attempt connection
     nmcli connection up "$SYSTEM_WIFI_CONN" ifname "$HOTSPOT_INTERFACE"
     
     # Wait for connection to complete
-    sleep 10
+    sleep 5
     
     # Check if connection was successful
     if check_wifi_connection; then
@@ -62,24 +57,20 @@ connect_wifi() {
 start_hotspot() {
     echo "Starting hotspot: $HOTSPOT_SSID"
     
-    # First shut down any existing hotspot connection
+    # First shut down any existing hotspot connection , Create or modify hotspot configuration
     if nmcli connection show | grep -q "$HOTSPOT_SSID"; then
         nmcli connection down "$HOTSPOT_SSID"
-    fi
-    
-    # Create or modify hotspot configuration
-    if ! nmcli connection show | grep -q "$HOTSPOT_SSID"; then
+    else 
         nmcli connection add type wifi con-name "$HOTSPOT_SSID" ifname "$HOTSPOT_INTERFACE" ssid "$HOTSPOT_SSID"
+        # Configure hotspot parameters
+        nmcli connection modify "$HOTSPOT_SSID" connection.autoconnect no 
+        nmcli connection modify "$HOTSPOT_SSID" wifi.mode ap
+        nmcli connection modify "$HOTSPOT_SSID" wifi-sec.key-mgmt wpa-psk
+        nmcli connection modify "$HOTSPOT_SSID" wifi-sec.psk "$HOTSPOT_PASSWORD"
+        nmcli connection modify "$HOTSPOT_SSID" ipv4.addresses "$WIFI_AP_GATEWAY/24"
+        nmcli connection modify "$HOTSPOT_SSID" ipv4.method shared
+        nmcli connection modify "$HOTSPOT_SSID" ipv6.method ignore
     fi
-    
-    # Configure hotspot parameters
-    nmcli connection modify "$HOTSPOT_SSID" connection.autoconnect no 
-    nmcli connection modify "$HOTSPOT_SSID" wifi.mode ap
-    nmcli connection modify "$HOTSPOT_SSID" wifi-sec.key-mgmt wpa-psk
-    nmcli connection modify "$HOTSPOT_SSID" wifi-sec.psk "$HOTSPOT_PASSWORD"
-    nmcli connection modify "$HOTSPOT_SSID" ipv4.addresses "$WIFI_AP_GATEWAY/24"
-    nmcli connection modify "$HOTSPOT_SSID" ipv4.method shared
-    nmcli connection modify "$HOTSPOT_SSID" ipv6.method ignore
     
     # Start the hotspot
     nmcli connection up "$HOTSPOT_SSID" ifname "$HOTSPOT_INTERFACE"

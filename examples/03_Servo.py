@@ -35,7 +35,7 @@ def test(channel):
     time.sleep(0.5)
 
 if __name__ == "__main__":
-    channel = 1
+    channel = 0
     while True:
         test(channel)
 

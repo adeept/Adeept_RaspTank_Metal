@@ -95,6 +95,7 @@ for x in range(3):
         break
 
 commands_pip_1 = [
+"sudo pip3 install Adafruit-Blinka-Raspberry-Pi-PWM rpi_ws281x",
 "sudo pip3 install adafruit-circuitpython-motor",
 "sudo pip3 install adafruit-circuitpython-pca9685",
 "sudo -H pip3 install --upgrade luma.oled",
@@ -109,6 +110,7 @@ commands_pip_1 = [
 "sudo pip3 install adafruit-circuitpython-busdevice adafruit-circuitpython-ssd1306",
 ]
 commands_pip_2 = [
+"sudo pip3 install Adafruit-Blinka-Raspberry-Pi-PWM rpi_ws281x --break-system-packages",
 "sudo pip3 install adafruit-circuitpython-motor --break-system-packages",
 "sudo pip3 install adafruit-circuitpython-pca9685 --break-system-packages",
 "sudo -H pip3 install --upgrade luma.oled --break-system-packages",
